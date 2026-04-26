@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum ReminderStatus {
+  ACTIVE
+  COMPLETED
+  DISMISSED
+}
+
+model User {
+  id           Int          @id @default(autoincrement())
+  fullName     String
+  email        String       @unique
+  passwordHash String
+  role         Role         @default(USER)
+  createdAt    DateTime     @default(now())
+  motorcycles  Motorcycle[]
+
+  @@map("users")
+}
+
+model Motorcycle {
+  id          Int                   @id @default(autoincrement())
+  ownerId     Int
+  owner       User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  nickname    String
+  make        String
+  model       String
+  year        Int?
+  vin         String?               @unique
+  currentMileage Int                @default(0)
+  createdAt   DateTime              @default(now())
+  serviceRecords ServiceRecord[]
+  maintenanceReminders MaintenanceReminder[]
+
+  @@map("motorcycles")
+}
+
+model ServiceRecord {
+  id           Int         @id @default(autoincrement())
+  motorcycleId Int
+  motorcycle   Motorcycle  @relation(fields: [motorcycleId], references: [id], onDelete: Cascade)
+  title        String
+  serviceDate  DateTime
+  mileage      Int
+  cost         Float?
+  notes        String?
+  createdAt    DateTime    @default(now())
+
+  @@map("service_records")
+}
+
+model MaintenanceReminder {
+  id             Int            @id @default(autoincrement())
+  motorcycleId   Int
+  motorcycle     Motorcycle     @relation(fields: [motorcycleId], references: [id], onDelete: Cascade)
+  taskName       String
+  intervalMiles  Int?
+  intervalMonths Int?
+  dueMileage     Int?
+  dueDate        DateTime?
+  status         ReminderStatus @default(ACTIVE)
+  createdAt      DateTime       @default(now())
+
+  @@map("maintenance_reminders")
+}

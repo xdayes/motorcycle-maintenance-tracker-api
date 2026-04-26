@@ -1,0 +1,271 @@
+openapi: 3.0.3
+info:
+  title: Motorcycle Maintenance Tracker API
+  version: 1.0.0
+  description: REST API with JWT authentication for motorcycles, service records, and maintenance reminders.
+servers:
+  - url: http://localhost:3000
+    description: Local server
+  - url: https://YOUR-RENDER-APP.onrender.com
+    description: Replace with your Render URL
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+    SignupRequest:
+      type: object
+      required: [fullName, email, password]
+      properties:
+        fullName: { type: string, example: Alex Rider }
+        email: { type: string, example: alex@example.com }
+        password: { type: string, example: Password123! }
+        role: { type: string, enum: [USER, ADMIN], example: USER }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, example: owner@example.com }
+        password: { type: string, example: Password123! }
+    MotorcycleInput:
+      type: object
+      required: [nickname, make, model]
+      properties:
+        nickname: { type: string, example: Hornet }
+        make: { type: string, example: Honda }
+        model: { type: string, example: CB600F }
+        year: { type: integer, example: 2008 }
+        vin: { type: string, nullable: true, example: VIN123456789 }
+        currentMileage: { type: integer, example: 18250 }
+    ServiceRecordInput:
+      type: object
+      required: [motorcycleId, title, serviceDate, mileage]
+      properties:
+        motorcycleId: { type: integer, example: 1 }
+        title: { type: string, example: Oil Change }
+        serviceDate: { type: string, format: date-time, example: 2026-04-01T12:00:00.000Z }
+        mileage: { type: integer, example: 18250 }
+        cost: { type: number, example: 65.50 }
+        notes: { type: string, example: Replaced oil and filter }
+    ReminderInput:
+      type: object
+      required: [motorcycleId, taskName]
+      properties:
+        motorcycleId: { type: integer, example: 1 }
+        taskName: { type: string, example: Chain Service }
+        intervalMiles: { type: integer, nullable: true, example: 500 }
+        intervalMonths: { type: integer, nullable: true, example: 1 }
+        dueMileage: { type: integer, nullable: true, example: 19000 }
+        dueDate: { type: string, format: date-time, nullable: true, example: 2026-05-01T12:00:00.000Z }
+        status: { type: string, enum: [ACTIVE, COMPLETED, DISMISSED], example: ACTIVE }
+paths:
+  /api/auth/signup:
+    post:
+      summary: Create a new user account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SignupRequest' }
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              example: { id: 3, fullName: Alex Rider, email: alex@example.com, role: USER }
+        '400': { description: Missing or invalid fields, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: Email already exists, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/auth/login:
+    post:
+      summary: Log in and receive a JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              example: { token: '<jwt>', user: { id: 1, fullName: Owner User, email: owner@example.com, role: USER } }
+        '400': { description: Missing email or password, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { description: Invalid credentials, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/motorcycles:
+    post:
+      summary: Create a motorcycle
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MotorcycleInput' }
+      responses:
+        '201': { description: Motorcycle created, content: { application/json: { example: { id: 1, ownerId: 1, nickname: Hornet, make: Honda, model: CB600F, year: 2008, vin: VIN123456789, currentMileage: 18250 } } } }
+        '400': { description: Invalid payload }
+        '401': { description: Missing or invalid JWT }
+        '409': { description: VIN already exists }
+    get:
+      summary: Get all motorcycles owned by the current user. Admin can view all.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: List of motorcycles, content: { application/json: { example: [{ id: 1, ownerId: 1, nickname: Hornet, make: Honda, model: CB600F }] } } }
+        '401': { description: Missing or invalid JWT }
+  /api/motorcycles/{id}:
+    get:
+      summary: Get one motorcycle by ID
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: Motorcycle found, content: { application/json: { example: { id: 1, ownerId: 1, nickname: Hornet, make: Honda, model: CB600F } } } }
+        '400': { description: Invalid ID }
+        '401': { description: Missing or invalid JWT }
+        '403': { description: Not the owner }
+        '404': { description: Motorcycle not found }
+    put:
+      summary: Update a motorcycle
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MotorcycleInput' }
+      responses:
+        '200': { description: Motorcycle updated, content: { application/json: { example: { id: 1, ownerId: 1, nickname: Updated Hornet, make: Honda, model: CB600F, year: 2008, currentMileage: 18500 } } } }
+        '400': { description: Invalid ID or payload }
+        '401': { description: Missing or invalid JWT }
+        '403': { description: Not the owner }
+        '404': { description: Motorcycle not found }
+        '409': { description: VIN already exists }
+    delete:
+      summary: Delete a motorcycle
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '204': { description: Motorcycle deleted. No response body. }
+        '400': { description: Invalid ID }
+        '401': { description: Missing or invalid JWT }
+        '403': { description: Not the owner }
+        '404': { description: Motorcycle not found }
+  /api/service-records:
+    post:
+      summary: Create a service record
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ServiceRecordInput' }
+      responses:
+        '201': { description: Service record created, content: { application/json: { example: { id: 1, motorcycleId: 1, title: Oil Change, mileage: 18250 } } } }
+        '400': { description: Invalid payload }
+        '401': { description: Missing or invalid JWT }
+        '403': { description: Parent motorcycle belongs to another user }
+        '404': { description: Parent motorcycle not found }
+    get:
+      summary: Get all service records owned by the current user. Admin can view all.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: List of service records, content: { application/json: { example: [{ id: 1, motorcycleId: 1, title: Oil Change, mileage: 18250 }] } } }
+        '401': { description: Missing or invalid JWT }
+  /api/service-records/{id}:
+    get:
+      summary: Get one service record by ID
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: Service record found }
+        '400': { description: Invalid ID }
+        '401': { description: Missing or invalid JWT }
+        '403': { description: Not the owner }
+        '404': { description: Service record not found }
+    put:
+      summary: Update a service record
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ServiceRecordInput' }
+      responses:
+        '200': { description: Service record updated }
+        '400': { description: Invalid ID or payload }
+        '401': { description: Missing or invalid JWT }
+        '403': { description: Not the owner }
+        '404': { description: Service record or parent motorcycle not found }
+    delete:
+      summary: Delete a service record
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '204': { description: Service record deleted. No response body. }
+        '400': { description: Invalid ID }
+        '401': { description: Missing or invalid JWT }
+        '403': { description: Not the owner }
+        '404': { description: Service record not found }
+  /api/maintenance-reminders:
+    post:
+      summary: Create a maintenance reminder
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReminderInput' }
+      responses:
+        '201': { description: Reminder created, content: { application/json: { example: { id: 1, motorcycleId: 1, taskName: Chain Service, dueMileage: 19000, status: ACTIVE } } } }
+        '400': { description: Invalid payload }
+        '401': { description: Missing or invalid JWT }
+        '403': { description: Parent motorcycle belongs to another user }
+        '404': { description: Parent motorcycle not found }
+    get:
+      summary: Get all maintenance reminders owned by the current user. Admin can view all.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: List of reminders, content: { application/json: { example: [{ id: 1, motorcycleId: 1, taskName: Chain Service, dueMileage: 19000, status: ACTIVE }] } } }
+        '401': { description: Missing or invalid JWT }
+  /api/maintenance-reminders/{id}:
+    get:
+      summary: Get one maintenance reminder by ID
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: Reminder found }
+        '400': { description: Invalid ID }
+        '401': { description: Missing or invalid JWT }
+        '403': { description: Not the owner }
+        '404': { description: Reminder not found }
+    put:
+      summary: Update a maintenance reminder
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReminderInput' }
+      responses:
+        '200': { description: Reminder updated }
+        '400': { description: Invalid ID or payload }
+        '401': { description: Missing or invalid JWT }
+        '403': { description: Not the owner }
+        '404': { description: Reminder or parent motorcycle not found }
+    delete:
+      summary: Delete a maintenance reminder
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '204': { description: Reminder deleted. No response body. }
+        '400': { description: Invalid ID }
+        '401': { description: Missing or invalid JWT }
+        '403': { description: Not the owner }
+        '404': { description: Reminder not found }
