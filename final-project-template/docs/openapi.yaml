@@ -4,10 +4,8 @@ info:
   version: 1.0.0
   description: REST API with JWT authentication for motorcycles, service records, and maintenance reminders.
 servers:
-  - url: http://localhost:3000
-    description: Local server
-  - url: https://YOUR-RENDER-APP.onrender.com
-    description: Replace with your Render URL
+  - url: https://motorcycle-maintenance-tracker-api.onrender.com
+    description: Render server
 components:
   securitySchemes:
     bearerAuth:
